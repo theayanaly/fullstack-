@@ -45,7 +45,6 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: |
-            theayanaly/3-tier-frontend:latest
             theayanaly/3-tier-frontend:v1.${{ github.run_number }}
       - name: Build and push backend image
         uses: docker/build-push-action@v5
@@ -54,5 +53,4 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            theayanaly/3-tier-backend:latest
             theayanaly/3-tier-backend:v1.${{ github.run_number }}
