@@ -1,52 +1,58 @@
-name: 3-Tier Syntax & Check
+name: 3-Tier CI/CD and Docker Push
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
-  check-all:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: rootpassword
-          MYSQL_DATABASE: testdb
-        ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping -h localhost" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
- 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-   
-      - name: Check Backend & DB Syntax
+      - name: Install & Check Backend
+        working-directory: ./backend
+        run: |
+          npm install
+          find . -name "*.js" -not -path "./node_modules/*" -print0 | xargs -0 -n1 node --check
+      - name: Install & Build Frontend
+        working-directory: ./frontend
         env:
-          DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASSWORD: rootpassword
-          DB_NAME: testdb
-          DB_PORT: 3306
+          CI: true
         run: |
-          cd backend
-          npm ci
-          npm run build --if-present
+          npm install
+          npm run build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Check Frontend Syntax
-        run: |
-          cd frontend
-          npm ci
-          npm run build --if-present
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            theayanaly/3-tier-frontend:latest
+            theayanaly/3-tier-frontend:v1.${{ github.run_number }}
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            theayanaly/3-tier-backend:latest
+            theayanaly/3-tier-backend:v1.${{ github.run_number }}
